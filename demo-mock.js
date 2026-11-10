@@ -1,12 +1,13 @@
 /*
  * MODE DEMO — backend tiruan di memori browser, hanya aktif jika URL diakhiri "?demo".
  * Dipakai untuk melihat/menguji tampilan tanpa menyentuh Google Sheets.
- * Login demo: admin / admin123  atau  operator / op123. Data hilang saat halaman dimuat ulang.
+ * Login demo: admin / admin123, supervisor / sup123, atau operator / op123. Data hilang saat halaman dimuat ulang.
  */
 (function () {
   const db = {
     users: [
       { username: 'admin', password: 'admin123', name: 'Administrator System', role: 'Admin' },
+      { username: 'supervisor', password: 'sup123', name: 'Supervisor Gudang', role: 'Supervisor' },
       { username: 'operator', password: 'op123', name: 'Operator Gudang', role: 'Operator' }
     ],
     master: {
@@ -174,7 +175,13 @@
         if (req.action !== 'login') {
           session = db.sessions[req.token];
           if (!session) return resolve({ ok: false, code: 'AUTH', error: 'Sesi berakhir. Silakan login kembali.' });
-          if (admin.indexOf(req.action) !== -1 && session.role !== 'Admin') return resolve({ ok: false, code: 'FORBIDDEN', error: 'Akses ditolak: fitur ini khusus Admin.' });
+          if (admin.indexOf(req.action) !== -1 && session.role !== 'Admin' && session.role !== 'Supervisor') return resolve({ ok: false, code: 'FORBIDDEN', error: 'Akses ditolak: fitur ini khusus Admin.' });
+          if (['deletePO', 'deleteMaster', 'deleteUser'].indexOf(req.action) !== -1 && session.role !== 'Admin') return resolve({ ok: false, code: 'FORBIDDEN', error: 'Akses ditolak: hanya Admin penuh yang boleh menghapus data.' });
+          if ((req.action === 'saveUser' || req.action === 'updateUser') && session.role !== 'Admin') {
+            const target = db.users.find(x => x.username === req.args[0].username);
+            if (req.args[0].role === 'Admin') return resolve({ ok: false, code: 'USER', error: 'Hanya Admin penuh yang boleh memberikan role Admin.' });
+            if (target && target.role === 'Admin') return resolve({ ok: false, code: 'USER', error: 'Hanya Admin penuh yang boleh mengubah akun Admin.' });
+          }
         }
         resolve({ ok: true, data: JSON.parse(JSON.stringify(fn.apply(null, [session].concat(req.args || [])))) });
       } catch (e) {

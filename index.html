@@ -102,6 +102,7 @@
     .pill.s-done { background: var(--ok-soft); color: var(--ok); }
     .pill.s-exp { background: var(--info-soft); color: var(--info); }
     .pill.r-admin { background: var(--brand-soft); color: var(--brand); }
+    .pill.r-sup { background: var(--info-soft); color: var(--info); }
     .bar { height: 8px; border-radius: 99px; background: var(--surface-2); overflow: hidden; border: 1px solid var(--line); }
     .bar > i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--brand), var(--brand-2)); transition: width .6s var(--ease); }
     .bar.full > i { background: var(--ok); }
@@ -607,7 +608,7 @@
    Tidak perlu diisi jika file ini disajikan langsung dari Apps Script.
    ===================================================================== */
 const CONFIG = {
-  API_URL: 'https://script.google.com/macros/s/AKfycbx-zezrG8m_1i2KcXZ3-zmOJBiL_Soumrv5T3cuv1pIa8qsldVYHVPFJ_C46HB00zOMdQ/exec'
+  API_URL: 'https://script.google.com/macros/s/AKfycbzJl9wcJ0fKuZR94axNLiSbttX11d8KX5qF2q3_gmeFZ7VLWQx0_FuzWoSrLYADifFoAw/exec'
 };
 const LIB = {
   qr: 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js',
@@ -842,7 +843,10 @@ const PAGES = [
   { id: 'master', label: 'Master',    icon: 'fa-database',         title: 'Master Data',      sub: 'Kelola pelanggan, warna, dan ukuran.', admin: true },
   { id: 'users',  label: 'User',      icon: 'fa-users-gear',       title: 'Kelola User',      sub: 'Akun dan hak akses pengguna.', admin: true }
 ];
-const isAdmin = () => state.user && state.user.role === 'Admin';
+// Admin = akses penuh. Supervisor = admin tanpa akses hapus. Operator = hanya scanner.
+const isAdmin = () => !!state.user && (state.user.role === 'Admin' || state.user.role === 'Supervisor');
+const canDelete = () => !!state.user && state.user.role === 'Admin';
+const ROLE_PILL = { Admin: 'r-admin', Supervisor: 'r-sup' };
 const myPages = () => PAGES.filter(p => !p.admin || isAdmin());
 
 function showLogin() {
@@ -1134,7 +1138,7 @@ function renderPOList() {
         <div class="c-act">
           <button class="btn sm icon" data-act="edit" title="Edit PO" aria-label="Edit PO"><i class="fa-solid fa-pen"></i></button>
           <button class="btn sm icon t-ok" data-act="export" title="Export XLSX" aria-label="Export XLSX"><i class="fa-solid fa-file-excel"></i></button>
-          <button class="btn sm icon t-bad" data-act="del" title="Hapus PO" aria-label="Hapus PO"><i class="fa-solid fa-trash"></i></button>
+          ${canDelete() ? '<button class="btn sm icon t-bad" data-act="del" title="Hapus PO" aria-label="Hapus PO"><i class="fa-solid fa-trash"></i></button>' : ''}
         </div>
       </div>`;
     }).join('');
@@ -1299,7 +1303,7 @@ function renderMaster() {
       <div class="t"><b>${esc(x.name)}</b></div>
       <div class="acts">
         <button class="btn sm icon" data-mact="edit" aria-label="Edit"><i class="fa-solid fa-pen"></i></button>
-        <button class="btn sm icon t-bad" data-mact="del" aria-label="Hapus"><i class="fa-solid fa-trash"></i></button>
+        ${canDelete() ? '<button class="btn sm icon t-bad" data-mact="del" aria-label="Hapus"><i class="fa-solid fa-trash"></i></button>' : ''}
       </div>
     </div>`).join('') : `<div class="empty"><i class="fa-solid fa-database"></i><b>${q ? 'Tidak ditemukan' : 'Belum ada data ' + MASTER[type].toLowerCase()}</b>${q ? 'Coba kata kunci lain.' : 'Tambahkan lewat form di atas.'}</div>`;
 }
@@ -1348,23 +1352,26 @@ async function loadUsers() {
 }
 function renderUsers(users) {
   state.users = users;
-  $('#usersCount').textContent = `${users.length} akun · ${users.filter(u => u.role === 'Admin').length} admin`;
+  const n = role => users.filter(u => u.role === role).length;
+  $('#usersCount').textContent = `${users.length} akun · ${n('Admin')} admin · ${n('Supervisor')} supervisor`;
   $('#userList').innerHTML = users.map(u => {
     const me = u.username === state.user.username;
+    const locked = !canDelete() && u.role === 'Admin'; // Supervisor tidak boleh mengubah akun Admin
     return `<div class="li" data-user="${esc(u.username)}">
       <span class="avatar">${esc((u.name || u.username).split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase())}</span>
       <div class="t"><b>${esc(u.name)} ${me ? '<small>(Anda)</small>' : ''}</b><small class="mono">${esc(u.username)}</small></div>
-      <span class="pill ${u.role === 'Admin' ? 'r-admin' : ''}">${esc(u.role)}</span>
+      <span class="pill ${ROLE_PILL[u.role] || ''}">${esc(u.role)}</span>
       <div class="acts">
-        <button class="btn sm icon" data-uact="edit" aria-label="Edit user"><i class="fa-solid fa-pen"></i></button>
-        <button class="btn sm icon t-bad" data-uact="del" aria-label="Hapus user" ${me ? 'disabled title="Tidak bisa menghapus akun sendiri"' : ''}><i class="fa-solid fa-trash"></i></button>
+        <button class="btn sm icon" data-uact="edit" aria-label="Edit user" ${locked ? 'disabled title="Hanya Admin penuh yang boleh mengubah akun Admin"' : ''}><i class="fa-solid fa-pen"></i></button>
+        ${canDelete() ? `<button class="btn sm icon t-bad" data-uact="del" aria-label="Hapus user" ${me ? 'disabled title="Tidak bisa menghapus akun sendiri"' : ''}><i class="fa-solid fa-trash"></i></button>` : ''}
       </div>
     </div>`;
   }).join('');
 }
 const roleSelect = (cur, disabled) => `<select class="input" id="uRole" ${disabled ? 'disabled' : ''}>
-  <option value="Operator" ${cur !== 'Admin' ? 'selected' : ''}>Operator — hanya scanner</option>
-  <option value="Admin" ${cur === 'Admin' ? 'selected' : ''}>Admin — akses penuh</option></select>`;
+  <option value="Operator" ${cur === 'Operator' ? 'selected' : ''}>Operator — hanya scanner</option>
+  <option value="Supervisor" ${cur === 'Supervisor' ? 'selected' : ''}>Supervisor — admin tanpa akses hapus</option>
+  ${canDelete() ? `<option value="Admin" ${cur === 'Admin' ? 'selected' : ''}>Admin — akses penuh</option>` : ''}</select>`;
 async function addUser() {
   const res = await modal({
     title: 'Tambah user baru', icon: 'fa-user-plus', confirmText: 'Simpan user',
