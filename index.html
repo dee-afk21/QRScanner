@@ -204,6 +204,15 @@
     .recent li { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px dashed var(--line); font-size: 13.5px; animation: rise .3s var(--ease); }
     .recent li:first-child { border-top: 0; }
     .recent i { width: 16px; text-align: center; }
+    .recent li.pending, .recent li.undone { color: var(--ink-3); }
+    .recent li.undone .t { text-decoration: line-through; }
+    .recent .btn { height: 28px; padding: 0 8px; font-size: 12px; }
+    .queue-info { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; color: var(--ink-2); }
+    button.opt { width: 100%; background: var(--surface); text-align: left; font: inherit; color: inherit; min-height: 68px; }
+    button.opt:disabled { opacity: .4; cursor: not-allowed; }
+    button.opt:not(:disabled):hover { border-color: var(--brand); background: var(--brand-soft); }
+    .opts { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+    .opt-t b { font-size: 15px; }
     .recent .ok { color: var(--ok); } .recent .bad { color: var(--bad); }
     .recent .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .recent time { color: var(--ink-3); font-size: 12px; font-variant-numeric: tabular-nums; }
@@ -494,6 +503,7 @@
                 <button class="btn block" id="btnCam" type="button"><i class="fa-solid fa-camera"></i><span>Scan dengan Kamera</span></button>
                 <button class="btn" id="btnDemoQR" type="button" hidden title="Isi contoh QR (demo)"><i class="fa-solid fa-wand-magic-sparkles"></i> QR contoh</button>
               </div>
+              <div id="queueInfo" class="queue-info" hidden><i class="fa-solid fa-circle-notch fa-spin"></i><span></span></div>
               <div id="camBox" hidden><div id="camView"></div></div>
               <div id="flashSlot"></div>
             </div>
@@ -608,7 +618,10 @@
    Tidak perlu diisi jika file ini disajikan langsung dari Apps Script.
    ===================================================================== */
 const CONFIG = {
-  API_URL: 'https://script.google.com/macros/s/AKfycbzJl9wcJ0fKuZR94axNLiSbttX11d8KX5qF2q3_gmeFZ7VLWQx0_FuzWoSrLYADifFoAw/exec'
+  API_URL: 'https://script.google.com/macros/s/AKfycbzJl9wcJ0fKuZR94axNLiSbttX11d8KX5qF2q3_gmeFZ7VLWQx0_FuzWoSrLYADifFoAw/exec',
+  // Berapa scan boleh menunggu jawaban server sekaligus. 3 = operator bisa scan beruntun
+  // tanpa menunggu; 1 = scan berikutnya baru bisa setelah server menjawab (paling aman).
+  SCAN_QUEUE: 3
 };
 const LIB = {
   qr: 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js',
@@ -641,6 +654,7 @@ const state = {
   token: null, user: null, page: null,
   lookup: { pelanggan: [], warna: [], ukuran: [] },
   activePO: [], po: null, scanBusy: false, cam: null, recent: [],
+  queue: [], pumping: false, savedRaw: new Set(),
   poList: null, poFilter: 'all', poQuery: '',
   formMode: 'new', masterTab: 'pelanggan', masterQuery: '', users: []
 };
@@ -714,16 +728,17 @@ function modal(opts) {
         <div class="m-err" hidden></div>
         <footer>
           <button type="button" class="btn" data-x>${esc(opts.cancelText || 'Batal')}</button>
-          <button type="submit" class="btn ${opts.danger ? 'danger' : 'primary'}">${esc(opts.confirmText || 'OK')}</button>
+          <button type="submit" class="btn ${opts.danger ? 'danger' : 'primary'}" ${opts.noConfirm ? 'hidden' : ''}>${esc(opts.confirmText || 'OK')}</button>
         </footer>
       </form>`;
     const form = $('form', d), errBox = $('.m-err', d), okBtn = $('[type=submit]', d);
     let done = false, working = false;
     const finish = v => { if (done) return; done = true; d.close(); d.innerHTML = ''; resolve(v); };
     const showErr = e => { errBox.textContent = e.message || String(e); errBox.hidden = false; errBox.style.animation = 'none'; void errBox.offsetWidth; errBox.style.animation = ''; if (opts.onError) opts.onError(e); };
+    if (opts.onOpen) opts.onOpen(d, finish);
     form.onsubmit = async ev => {
       ev.preventDefault();
-      if (working) return;
+      if (working || opts.noConfirm) return;
       errBox.hidden = true;
       let value = true;
       try { if (opts.collect) value = opts.collect(d); } catch (e) { return showErr(e); }
@@ -761,6 +776,7 @@ function tone(freq, dur, type = 'sine', when = 0, vol = .16) {
 }
 const sfx = {
   ok() { tone(880, .09); tone(1320, .16, 'sine', .09); if (navigator.vibrate) navigator.vibrate(60); },
+  pick() { tone(1050, .07); if (navigator.vibrate) navigator.vibrate(40); },
   bad() { tone(220, .2, 'square', 0, .12); tone(170, .32, 'square', .22, .12); if (navigator.vibrate) navigator.vibrate([120, 70, 120]); },
   done() { [660, 880, 1100, 1320].forEach((f, i) => tone(f, .16, 'sine', i * .11)); }
 };
@@ -857,7 +873,8 @@ function showLogin() {
 function endSession() {
   stopCam();
   store.del('coa_session'); store.del('coa_page'); store.del('coa_po');
-  Object.assign(state, { token: null, user: null, po: null, poList: null, recent: [], users: [], page: null });
+  Object.assign(state, { token: null, user: null, po: null, poList: null, recent: [], users: [], page: null, queue: [], scanBusy: false, savedRaw: new Set() });
+  renderRecent(); updateQueueInfo();
   if ($('#modal').open) $('#modal').close();
   $('#loginPass').value = '';
   showLogin();
@@ -951,6 +968,10 @@ function clearPO() {
   $('#poEmpty').hidden = false; $('#poPanel').hidden = true; $('#scanCard').hidden = true;
 }
 async function selectPO(noPO) {
+  if (state.queue.length && state.po) { // jangan pindah PO selagi masih ada scan yang dikirim
+    $('#poSelect').value = state.po.noPO;
+    return toast('Tunggu sampai semua scan terkirim sebelum ganti PO.', 'info');
+  }
   if (!noPO) return clearPO();
   $('#itemsGrid').innerHTML = '<div class="skel"></div><div class="skel"></div><div class="skel"></div>';
   const d = await run(null, () => api('getPODetails', noPO));
@@ -963,20 +984,25 @@ async function selectPO(noPO) {
 function renderDetails(d, bumpKey) {
   state.po = d;
   $('#poEmpty').hidden = true; $('#poPanel').hidden = false; $('#scanCard').hidden = false;
-  const pct = d.totalTarget > 0 ? Math.min(100, Math.round(d.totalScanned / d.totalTarget * 100)) : 0;
-  const done = d.totalTarget > 0 && d.totalScanned >= d.totalTarget;
+  // Angka di layar = data server + scan yang masih di antrean (belum dijawab server).
+  const pend = pendingMap();
+  const total = d.totalScanned + state.queue.length;
+  const pct = d.totalTarget > 0 ? Math.min(100, Math.round(total / d.totalTarget * 100)) : 0;
+  const done = d.totalTarget > 0 && total >= d.totalTarget;
   $('#hero').classList.toggle('done', done);
   $('#ringVal').style.strokeDashoffset = (326.73 * (1 - pct / 100)).toFixed(2);
   $('#ringPct').textContent = pct + '%';
   $('#poTitle').textContent = d.noPO;
   $('#poStatus').outerHTML = statusPill(d.status).replace('<span', '<span id="poStatus"');
   $('#poMeta').textContent = [nameOf('pelanggan', d.idPelanggan), d.mop && 'MOP ' + d.mop, d.tglProduksi && 'Produksi ' + isoToDMY(d.tglProduksi)].filter(Boolean).join(' · ');
-  $('#nScanned').textContent = fmt(d.totalScanned);
+  $('#nScanned').textContent = fmt(total);
   $('#nTarget').textContent = fmt(d.totalTarget);
-  $('#nLeft').textContent = fmt(Math.max(0, d.totalTarget - d.totalScanned));
+  $('#nLeft').textContent = fmt(Math.max(0, d.totalTarget - total));
   $('#itemsGrid').innerHTML = d.items.length ? d.items.map(it => {
-    const p = it.qtyTarget > 0 ? Math.min(100, it.qtyScanned / it.qtyTarget * 100) : 0;
-    const key = [it.deskripsi, it.idWarna, it.idUkuran].join('|');
+    const key = itemKeyOf(it);
+    const sc = it.qtyScanned + (pend[key] || 0);
+    it = Object.assign({}, it, { qtyScanned: sc, isComplete: it.qtyTarget > 0 && sc >= it.qtyTarget });
+    const p = it.qtyTarget > 0 ? Math.min(100, sc / it.qtyTarget * 100) : 0;
     return `<div class="item ${it.isComplete ? 'done' : ''} ${key === bumpKey ? 'bump' : ''}">
       <div class="item-top">
         <span class="size">${esc(nameOf('ukuran', it.idUkuran))}</span>
@@ -999,63 +1025,136 @@ function flash(type, title, detail) {
   card.classList.remove('ok', 'bad'); void card.offsetWidth;
   if (type !== 'info') { card.classList.add(type); setTimeout(() => card.classList.remove(type), 900); }
 }
-function addRecent(ok, text) {
+function addRecent(entry) {
   const d = new Date();
-  state.recent.unshift({ ok, text, time: `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}` });
-  state.recent = state.recent.slice(0, 6);
-  $('#recentCard').hidden = false;
-  $('#recentList').innerHTML = state.recent.map(r => `<li><i class="fa-solid ${r.ok ? 'fa-check ok' : 'fa-xmark bad'}"></i><span class="t">${esc(r.text)}</span><time>${r.time}</time></li>`).join('');
+  entry.time = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  state.recent.unshift(entry);
+  state.recent = state.recent.slice(0, 8);
+  renderRecent();
+}
+function setRecent(id, patch) {
+  const r = state.recent.find(x => x.id === id);
+  if (r) { Object.assign(r, patch); renderRecent(); }
+}
+function renderRecent() {
+  const icon = { pending: 'fa-circle-notch fa-spin', ok: 'fa-check ok', bad: 'fa-xmark bad', undone: 'fa-rotate-left' };
+  $('#recentCard').hidden = !state.recent.length;
+  $('#recentList').innerHTML = state.recent.map(r => `<li class="${r.status}">
+    <i class="fa-solid ${icon[r.status]}"></i><span class="t" title="${esc(r.text)}">${esc(r.text)}</span>
+    ${r.status === 'ok' ? `<button type="button" class="btn sm ghost t-bad" data-undo="${r.id}" title="Batalkan scan ini"><i class="fa-solid fa-rotate-left"></i> Batal</button>` : `<time>${r.time}</time>`}
+  </li>`).join('');
+}
+
+/*
+ * ALUR SCAN CEPAT
+ * scan -> pilihan ukuran muncul seketika (dari data PO yang sudah ada di layar) -> satu ketukan
+ * -> masuk antrean dan dikirim di latar belakang (1 panggilan server = verifikasi + simpan).
+ * Kolom scan langsung siap lagi. Penolakan server (duplikat / tidak terdaftar) datang menyusul
+ * lewat alarm. CONFIG.SCAN_QUEUE membatasi berapa scan boleh menunggu jawaban server.
+ */
+let jobSeq = 0;
+const itemKeyOf = o => [o.deskripsi, o.idWarna, o.idUkuran].join('|');
+const maxQueue = () => Math.max(1, parseInt(CONFIG.SCAN_QUEUE, 10) || 1);
+function pendingMap() { const m = {}; state.queue.forEach(j => { m[j.key] = (m[j.key] || 0) + 1; }); return m; }
+const shortQR = raw => raw.length > 28 ? '…' + raw.slice(-26) : raw;
+
+function updateQueueInfo() {
+  const n = state.queue.length;
+  $('#queueInfo').hidden = !n;
+  $('#queueInfo span').textContent = `Mengirim ${n} scan ke server…`;
+  $('#scanBtn').classList.toggle('loading', n >= maxQueue());
 }
 
 async function submitScan(raw) {
   raw = String(raw || '').trim();
   if (!raw || !state.po || state.scanBusy) return;
-  state.scanBusy = true;
-  $('#scanBtn').classList.add('loading');
-  try {
-    const v = await api('verifyScan', state.po.noPO, raw);
-    const res = await specDialog(v);
-    if (!res) { flash('info', 'Scan dibatalkan', `Item ${v.itemCode} belum disimpan.`); return; }
-    const it = res.item;
-    const label = `${nameOf('warna', it.idWarna)} · ${nameOf('ukuran', it.idUkuran)}`;
-    renderDetails(res.poDetails, [it.deskripsi, it.idWarna, it.idUkuran].join('|'));
-    flash('ok', `Tersimpan: ${res.itemCode}`, `${it.deskripsi} — ${label}`);
-    addRecent(true, `${res.itemCode} — ${label}`);
-    if (res.poDetails.status === 'Completed') { sfx.done(); toast(`PO ${res.poDetails.noPO} selesai 100%!`, 'ok'); refreshActivePO(); }
-    else sfx.ok();
-  } catch (e) {
-    if (e.code === 'AUTH') return;
-    sfx.bad();
-    flash('bad', 'Scan ditolak', e.message);
-    addRecent(false, e.message);
-  } finally {
-    state.scanBusy = false; camLast.at = Date.now();
-    $('#scanBtn').classList.remove('loading');
-    focusScan();
-  }
+  const reject = msg => { sfx.bad(); flash('bad', 'Scan ditolak', msg); focusScan(); };
+  if (state.queue.some(j => j.raw === raw) || state.savedRaw.has(raw)) return reject('DUPLIKAT: QR ini baru saja Anda scan.');
+  if (state.queue.length >= maxQueue()) return reject('Scan sebelumnya masih dikirim. Tunggu sebentar, lalu scan ulang item ini.');
+
+  const pend = pendingMap();
+  const options = state.po.items.map(it => Object.assign({}, it, { sisa: it.qtyTarget - it.qtyScanned - (pend[itemKeyOf(it)] || 0) }));
+  if (!options.some(o => o.sisa > 0)) return reject(`Seluruh item PO ${state.po.noPO} sudah 100% komplit.`);
+
+  state.scanBusy = true; // dialog pilihan sedang terbuka
+  const opt = await specDialog(raw, options);
+  state.scanBusy = false; camLast.at = Date.now();
+  if (!opt || !state.po) { flash('info', 'Scan dibatalkan', 'Item belum disimpan.'); return focusScan(); }
+
+  const label = `${nameOf('warna', opt.idWarna)} · ${nameOf('ukuran', opt.idUkuran)}`;
+  const job = { id: ++jobSeq, raw, key: itemKeyOf(opt), opt, noPO: state.po.noPO, label };
+  state.queue.push(job);
+  addRecent({ id: job.id, status: 'pending', text: `${shortQR(raw)} — ${label}`, noPO: job.noPO, raw });
+  $('#flashSlot').innerHTML = '';
+  renderDetails(state.po, job.key);
+  sfx.pick();
+  updateQueueInfo();
+  focusScan();
+  pumpQueue();
 }
 
-function specDialog(v) {
-  const single = v.options.length === 1;
-  const opts = v.options.map((o, i) => `
-    <label class="opt">
-      <input type="radio" name="spec" value="${i}" ${single ? 'checked' : ''}>
+async function pumpQueue() {
+  if (state.pumping) return;
+  state.pumping = true;
+  while (state.queue.length) {
+    const job = state.queue[0];
+    let res = null, err = null;
+    try { res = await api('confirmScan', job.noPO, job.raw, job.opt.deskripsi, job.opt.idWarna, job.opt.idUkuran); }
+    catch (e) { err = e; }
+    if (err && err.code === 'AUTH') break; // endSession sudah mengosongkan antrean
+    state.queue.shift();
+    const samePO = state.po && state.po.noPO === job.noPO;
+    if (res) {
+      state.savedRaw.add(job.raw);
+      setRecent(job.id, { status: 'ok', text: `${res.itemCode} — ${job.label}`, itemCode: res.itemCode });
+      if (samePO) renderDetails(res.poDetails);
+      if (res.poDetails.status === 'Completed' && !state.queue.length) { sfx.done(); toast(`PO ${job.noPO} selesai 100%!`, 'ok'); refreshActivePO(); }
+    } else {
+      // Gagal jaringan: tidak dikirim ulang otomatis, karena jika sebenarnya sudah tersimpan
+      // akan muncul sebagai "duplikat". Operator scan ulang dan server yang memutuskan.
+      const msg = err.code === 'USER' || err.code === 'FORBIDDEN' ? err.message : err.message + ' Scan ulang item ini.';
+      sfx.bad();
+      setRecent(job.id, { status: 'bad', text: msg });
+      flash('bad', 'Scan ditolak — sisihkan barangnya', `${msg} (${job.label}, QR ${shortQR(job.raw)})`);
+      if (samePO) renderDetails(state.po);
+    }
+    updateQueueInfo();
+  }
+  state.pumping = false;
+  updateQueueInfo();
+}
+
+/** Semua item PO tampil di posisi tetap (yang kuotanya penuh dinonaktifkan) agar letak tombol tidak bergeser. */
+function specDialog(raw, options) {
+  const tiles = options.map((o, i) => `
+    <button type="button" class="opt" data-i="${i}" ${o.sisa > 0 ? '' : 'disabled'}>
       <span class="size">${esc(nameOf('ukuran', o.idUkuran))}</span>
-      <span class="opt-t"><b>${esc(o.deskripsi)}</b><small>${esc(nameOf('warna', o.idWarna))}</small></span>
-      <span class="opt-r"><b>${fmt(o.sisa)}</b><small>sisa</small></span>
-    </label>`).join('');
+      <span class="opt-t"><b>${esc(nameOf('warna', o.idWarna))}</b><small>${esc(o.deskripsi)}</small></span>
+      <span class="opt-r"><b>${o.sisa > 0 ? fmt(o.sisa) : '<i class="fa-solid fa-check"></i>'}</b><small>${o.sisa > 0 ? 'sisa' : 'penuh'}</small></span>
+    </button>`).join('');
   return modal({
-    title: 'Pilih spesifikasi item', icon: 'fa-box-open', wide: true, sticky: true, noEnter: true,
-    confirmText: 'Simpan scan',
-    html: `<div class="kv"><span>Item <b>${esc(v.itemCode)}</b></span><span>Batch <b>${esc(v.batchCode)}</b></span></div><div class="opts">${opts}</div>`,
-    collect: d => {
-      const picked = $('input[name=spec]:checked', d);
-      if (!picked) throw new Error('Pilih dulu warna & ukuran yang sesuai produk.');
-      return v.options[+picked.value];
-    },
-    action: o => api('confirmScan', state.po.noPO, v.scannedURL, o.deskripsi, o.idWarna, o.idUkuran),
-    onError: () => sfx.bad()
+    title: 'Pilih warna & ukuran', text: 'Ketuk sekali untuk menyimpan.', icon: 'fa-box-open',
+    wide: true, sticky: true, noEnter: true, noConfirm: true,
+    html: `<div class="kv"><span>QR <b>${esc(shortQR(raw))}</b></span></div><div class="opts">${tiles}</div>`,
+    onOpen: (d, finish) => $$('.opt', d).forEach(b => { b.onclick = () => finish(options[+b.dataset.i]); })
   });
+}
+
+async function undoScan(id) {
+  const r = state.recent.find(x => x.id === id);
+  if (!r || !r.itemCode) return;
+  const res = await modal({
+    title: `Batalkan scan ${r.itemCode}?`, text: 'Item dihapus dari log scan dan bisa di-scan ulang dengan ukuran yang benar.',
+    icon: 'fa-rotate-left', tone: 'bad', danger: true, confirmText: 'Batalkan scan',
+    action: () => api('undoScan', r.noPO, r.itemCode)
+  });
+  if (!res) return focusScan();
+  state.savedRaw.delete(r.raw);
+  setRecent(id, { status: 'undone', text: r.text + ' (dibatalkan)' });
+  if (state.po && state.po.noPO === res.poDetails.noPO) renderDetails(res.poDetails);
+  toast(res.message, 'ok');
+  refreshActivePO();
+  focusScan();
 }
 
 /* ---------- kamera ---------- */
@@ -1434,6 +1533,7 @@ function bind() {
     if ((el = t.closest('[data-go]'))) { if (el.dataset.go === 'form' && state.formMode === 'edit') resetForm(); return go(el.dataset.go); }
     if (t.closest('[data-theme-toggle]')) return applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
     if (t.closest('[data-logout]')) return logout();
+    if ((el = t.closest('[data-undo]'))) return undoScan(+el.dataset.undo);
     if ((el = t.closest('[data-filter]'))) { state.poFilter = el.dataset.filter; return renderPOList(); }
     if ((el = t.closest('[data-act]'))) {
       const noPO = el.closest('[data-po]').dataset.po;
@@ -1482,6 +1582,8 @@ function bind() {
   $('#btnAddUser').onclick = addUser;
 
   document.addEventListener('visibilitychange', () => { if (document.hidden) stopCam(); });
+  // Scan yang masih di antrean hilang jika halaman ditutup: minta konfirmasi dulu.
+  window.addEventListener('beforeunload', e => { if (state.queue.length) { e.preventDefault(); e.returnValue = ''; } });
 }
 
 async function init() {
