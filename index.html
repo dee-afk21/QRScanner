@@ -182,6 +182,18 @@
     .col { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; min-width: 0; }
     .row { display: flex; gap: 8px; align-items: center; }
     .row > .btn.block { flex: 1; width: auto; min-width: 0; }
+    .combo { position: relative; flex: 1; min-width: 0; }
+    .combo > i { position: absolute; left: 16px; top: 26px; transform: translateY(-50%); color: var(--ink-3); pointer-events: none; }
+    .combo .input { padding: 0 44px; text-overflow: ellipsis; }
+    .combo #poClear { position: absolute; right: 9px; top: 9px; }
+    .combo-drop { position: absolute; z-index: 30; left: 0; right: 0; top: calc(100% + 6px); background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow-lg); padding: 6px; max-height: min(360px, 50dvh); overflow-y: auto; animation: pop .18s var(--ease); }
+    .combo-opt { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border: 0; border-radius: 10px; background: transparent; text-align: left; cursor: pointer; font: inherit; color: inherit; }
+    .combo-opt > span:first-child { flex: 1; min-width: 0; line-height: 1.3; }
+    .combo-opt b { display: block; font-size: 13.5px; overflow-wrap: anywhere; }
+    .combo-opt small { color: var(--ink-3); font-size: 12.5px; }
+    .combo-opt.act, .combo-opt:hover { background: var(--surface-2); }
+    .combo-opt.sel b { color: var(--brand); }
+    .combo-empty { padding: 16px; text-align: center; color: var(--ink-3); font-size: 14px; }
     .lbl { display: block; font-size: 12.5px; font-weight: 700; color: var(--ink-2); margin-bottom: 8px; }
     #scanCard { transition: box-shadow .3s, border-color .3s; }
     #scanCard.ok { border-color: var(--ok); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ok) 20%, transparent); }
@@ -485,9 +497,15 @@
         <div class="scan-grid">
           <div class="col">
             <div class="card">
-              <label class="lbl" for="poSelect">PO Aktif</label>
+              <label class="lbl" for="poInput">PO Aktif</label>
               <div class="row">
-                <select id="poSelect" class="input lg"><option value="">Memuat daftar PO…</option></select>
+                <div class="combo">
+                  <i class="fa-solid fa-magnifying-glass"></i>
+                  <input class="input lg" id="poInput" placeholder="Memuat daftar PO…" autocomplete="off" autocapitalize="none" spellcheck="false" role="combobox" aria-controls="poDrop" aria-autocomplete="list">
+                  <button type="button" class="btn icon ghost sm" id="poClear" hidden aria-label="Kosongkan pilihan PO"><i class="fa-solid fa-xmark"></i></button>
+                  <div class="combo-drop" id="poDrop" role="listbox" hidden></div>
+                </div>
+                <select id="poSelect" hidden aria-hidden="true" tabindex="-1"></select>
                 <button class="btn icon" id="btnRefreshPO" title="Muat ulang daftar PO" aria-label="Muat ulang daftar PO" style="height:52px;width:52px"><i class="fa-solid fa-rotate"></i></button>
               </div>
             </div>
@@ -618,7 +636,7 @@
    Tidak perlu diisi jika file ini disajikan langsung dari Apps Script.
    ===================================================================== */
 const CONFIG = {
-  API_URL: 'https://script.google.com/macros/s/AKfycbwNcngiAdPtff9piejnnhbJ_Odj9Z8Oabsd-gou3eBFbBcioIOwMSyGgyPbC5oE7ow3hw/exec',
+  API_URL: 'https://script.google.com/macros/s/AKfycbyKe2-h0UZP9mJpbRoZAmQ67VZiKHyHt5oZ0jDqtYxfR8821KKQkCLc5lwftQEybwmgaA/exec',
   // Berapa scan boleh menunggu jawaban server sekaligus. 3 = operator bisa scan beruntun
   // tanpa menunggu; 1 = scan berikutnya baru bisa setelah server menjawab (paling aman).
   SCAN_QUEUE: 3
@@ -955,6 +973,59 @@ function renderPOSelect() {
     ? '<option value="">— Pilih nomor PO —</option>' + state.activePO.map(p => `<option value="${esc(p.noPO)}">${esc(p.noPO)} · ${esc(nameOf('pelanggan', p.idPelanggan))}</option>`).join('')
     : '<option value="">Tidak ada PO aktif</option>';
   if (state.activePO.some(p => p.noPO === current)) sel.value = current;
+  $('#poInput').placeholder = state.activePO.length ? 'Cari No PO atau MOP…' : 'Tidak ada PO aktif';
+  syncPOInput();
+}
+
+/* ---------- kotak pencarian PO: cocokkan No PO, MOP, atau nama pelanggan ---------- */
+/* <select id="poSelect"> tersembunyi tetap menjadi penyimpan nilai PO terpilih. */
+function syncPOInput() {
+  const p = state.activePO.find(x => x.noPO === $('#poSelect').value);
+  $('#poInput').value = p ? p.noPO + (p.mop ? '  ·  MOP ' + p.mop : '') : '';
+  $('#poClear').hidden = !p;
+}
+function openPODrop(query) {
+  const words = String(query || '').toLowerCase().split(/\s+/).filter(Boolean);
+  const list = state.activePO.filter(p => {
+    const hay = [p.noPO, p.mop, nameOf('pelanggan', p.idPelanggan)].join(' ').toLowerCase();
+    return words.every(w => hay.includes(w));
+  });
+  const current = $('#poSelect').value;
+  $('#poDrop').innerHTML = list.length ? list.map((p, i) => `
+    <button type="button" class="combo-opt ${i === 0 ? 'act' : ''} ${p.noPO === current ? 'sel' : ''}" role="option" data-pick-po="${esc(p.noPO)}">
+      <span><b class="mono">${esc(p.noPO)}</b><small>${p.mop ? 'MOP ' + esc(p.mop) + ' · ' : ''}${esc(nameOf('pelanggan', p.idPelanggan))}</small></span>
+      ${statusPill(p.status)}
+    </button>`).join('') : `<div class="combo-empty">${state.activePO.length ? 'Tidak ada PO atau MOP yang cocok.' : 'Tidak ada PO aktif.'}</div>`;
+  $('#poDrop').hidden = false;
+}
+function closePODrop() { $('#poDrop').hidden = true; }
+function pickPO(noPO) {
+  $('#poSelect').value = noPO;
+  closePODrop(); $('#poInput').blur(); syncPOInput();
+  selectPO(noPO);
+}
+function bindPOCombo() {
+  const input = $('#poInput'), drop = $('#poDrop');
+  input.onfocus = () => { input.select(); openPODrop(''); };
+  input.oninput = () => openPODrop(input.value);
+  input.onblur = () => setTimeout(() => { closePODrop(); syncPOInput(); }, 150);
+  input.onkeydown = e => {
+    const opts = $$('.combo-opt', drop);
+    let i = opts.findIndex(o => o.classList.contains('act'));
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!opts.length) return;
+      if (opts[i]) opts[i].classList.remove('act');
+      i = (i + (e.key === 'ArrowDown' ? 1 : -1) + opts.length) % opts.length;
+      opts[i].classList.add('act'); opts[i].scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (opts[i]) pickPO(opts[i].dataset.pickPo);
+    } else if (e.key === 'Escape') input.blur();
+  };
+  drop.onmousedown = e => e.preventDefault(); // jaga fokus di input saat opsi diklik
+  drop.onclick = e => { const b = e.target.closest('[data-pick-po]'); if (b) pickPO(b.dataset.pickPo); };
+  $('#poClear').onclick = () => { $('#poSelect').value = ''; selectPO(''); if (!state.po) input.focus(); };
 }
 async function refreshActivePO(btn) {
   const list = await run(btn, () => api('getActivePO'));
@@ -964,12 +1035,12 @@ async function refreshActivePO(btn) {
 }
 function clearPO() {
   state.po = null; store.del('coa_po'); stopCam();
-  $('#poSelect').value = '';
+  $('#poSelect').value = ''; syncPOInput();
   $('#poEmpty').hidden = false; $('#poPanel').hidden = true; $('#scanCard').hidden = true;
 }
 async function selectPO(noPO) {
   if (state.queue.length && state.po) { // jangan pindah PO selagi masih ada scan yang dikirim
-    $('#poSelect').value = state.po.noPO;
+    $('#poSelect').value = state.po.noPO; syncPOInput();
     return toast('Tunggu sampai semua scan terkirim sebelum ganti PO.', 'info');
   }
   if (!noPO) return clearPO();
@@ -983,6 +1054,7 @@ async function selectPO(noPO) {
 }
 function renderDetails(d, bumpKey) {
   state.po = d;
+  if (document.activeElement !== $('#poInput')) { $('#poSelect').value = d.noPO; syncPOInput(); }
   $('#poEmpty').hidden = true; $('#poPanel').hidden = false; $('#scanCard').hidden = false;
   // Angka di layar = data server + scan yang masih di antrean (belum dijawab server).
   const pend = pendingMap();
@@ -1016,7 +1088,11 @@ function renderDetails(d, bumpKey) {
 
 function focusScan() {
   if (state.page !== 'scan' || state.cam || !state.po || $('#modal').open) return;
-  setTimeout(() => { const el = $('#scanInput'); if (el.offsetParent) el.focus({ preventScroll: true }); }, 120);
+  setTimeout(() => {
+    const el = $('#scanInput');
+    // jangan rebut fokus saat operator sedang mengetik di pencarian PO
+    if (el.offsetParent && document.activeElement !== $('#poInput')) el.focus({ preventScroll: true });
+  }, 120);
 }
 function flash(type, title, detail) {
   const icons = { ok: 'fa-circle-check', bad: 'fa-circle-xmark', info: 'fa-circle-info' };
@@ -1552,7 +1628,7 @@ function bind() {
   });
 
   // Scanner
-  $('#poSelect').onchange = e => selectPO(e.target.value);
+  bindPOCombo();
   $('#btnRefreshPO').onclick = e => refreshActivePO(e.currentTarget);
   $('#scanForm').onsubmit = e => { e.preventDefault(); const el = $('#scanInput'), v = el.value; el.value = ''; submitScan(v); };
   $('#btnCam').onclick = toggleCam;

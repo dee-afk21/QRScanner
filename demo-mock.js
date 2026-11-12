@@ -68,7 +68,7 @@
     if (po.status !== 'Exported') po.status = statusFor(tt, ts);
     return Object.assign({}, po, { totalTarget: tt, totalScanned: ts, items });
   }
-  const activePO = () => db.po.map(p => details(p.noPO)).filter(p => p.status !== 'Exported').map(p => ({ noPO: p.noPO, idPelanggan: p.idPelanggan, status: p.status }));
+  const activePO = () => db.po.map(p => details(p.noPO)).filter(p => p.status !== 'Exported').map(p => ({ noPO: p.noPO, idPelanggan: p.idPelanggan, mop: p.mop, status: p.status }));
   const users = () => db.users.map(u => ({ username: u.username, name: u.name, role: u.role }));
   const dmy = (s, label) => { const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(s || ''); if (!m) throw fail(label + ' tidak valid.'); return m[3] + '-' + m[2] + '-' + m[1]; };
   function normItems(list) {
@@ -106,8 +106,15 @@
       const v = verify(noPO, url);
       const opt = v.options.find(o => key(o.deskripsi, o.idWarna, o.idUkuran) === key(desc, w, u));
       if (!opt) throw fail('Kuota item tersebut sudah penuh atau item tidak ada di PO. Scan ulang.');
-      db.logs.push({ noPO, item: v.itemCode, batch: v.batchCode, deskripsi: desc, idWarna: w, idUkuran: u, url: v.scannedURL });
+      db.logs.push({ noPO, item: v.itemCode, batch: v.batchCode, deskripsi: desc, idWarna: w, idUkuran: u, url: v.scannedURL, op: s.name });
       return { message: 'BERHASIL: ' + v.itemCode, itemCode: v.itemCode, item: { deskripsi: desc, idWarna: w, idUkuran: u }, poDetails: details(noPO) };
+    },
+    undoScan(s, noPO, itemCode) {
+      const log = db.logs.find(l => l.item === itemCode && l.noPO === noPO);
+      if (!log) throw fail('Scan tidak ditemukan (mungkin sudah dibatalkan).');
+      if (s.role !== 'Admin' && log.op !== s.name) throw fail('Anda hanya bisa membatalkan scan milik Anda sendiri.');
+      db.logs = db.logs.filter(l => l !== log);
+      return { message: 'Scan ' + itemCode + ' dibatalkan.', itemCode, poDetails: details(noPO) };
     },
     listPO() {
       return db.po.map(p => { const d = details(p.noPO); return Object.assign({}, p, { status: d.status, totalTarget: d.totalTarget, totalScanned: d.totalScanned, lines: d.items.length, percent: d.totalTarget ? Math.min(100, Math.round(d.totalScanned / d.totalTarget * 100)) : 0 }); });
