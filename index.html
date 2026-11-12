@@ -202,9 +202,28 @@
     .scan-field > i { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--ink-3); font-size: 18px; }
     .scan-field .input { height: 58px; padding: 0 60px 0 46px; font-size: 16px; font-family: var(--mono); border-width: 2px; }
     .scan-field .btn { position: absolute; right: 7px; top: 7px; height: 44px; width: 44px; }
-    #camBox { margin-top: 12px; border-radius: 14px; overflow: hidden; background: #000; position: relative; }
-    #camView { width: 100%; min-height: 240px; }
-    #camView video { display: block; width: 100% !important; object-fit: cover; }
+    #camBox, #camBox2 { margin-top: 12px; border-radius: 14px; overflow: hidden; background: #000; position: relative; }
+    #camView, #camView2 { width: 100%; min-height: 240px; }
+    #camView video, #camView2 video { display: block; width: 100% !important; object-fit: cover; }
+    /* Cek QR */
+    .verdict { display: flex; gap: 14px; align-items: center; padding: 16px 18px; border-radius: 14px; animation: pop .3s var(--ease); }
+    .verdict > i { font-size: 30px; }
+    .verdict b { display: block; font-size: 19px; font-weight: 800; letter-spacing: -.01em; }
+    .verdict span { font-size: 14px; }
+    .verdict.ok { background: var(--ok-soft); color: var(--ok); }
+    .verdict.bad { background: var(--bad-soft); color: var(--bad); }
+    .verdict.info { background: var(--info-soft); color: var(--info); }
+    .dest { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+    .dest > div { border: 2px solid var(--brand); background: var(--brand-soft); border-radius: 14px; padding: 12px 14px; min-width: 0; }
+    .dest small { display: block; font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--brand); }
+    .dest b { display: block; font-family: var(--mono); font-size: 19px; font-weight: 700; overflow-wrap: anywhere; line-height: 1.3; margin-top: 2px; }
+    .facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+    .fact { background: var(--surface-2); border-radius: 12px; padding: 10px 13px; min-width: 0; }
+    .fact.w2 { grid-column: 1 / -1; }
+    .fact small { display: block; font-size: 11.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-3); }
+    .fact b { display: block; font-weight: 700; overflow-wrap: anywhere; }
+    .check-note { margin-top: 12px; }
+    @media (max-width: 520px) { .dest { grid-template-columns: minmax(0, 1fr); } }
     .flash { display: flex; gap: 12px; align-items: flex-start; margin-top: 12px; padding: 13px 14px; border-radius: 13px; animation: pop .3s var(--ease); font-size: 14px; }
     .flash > i { font-size: 20px; margin-top: 1px; }
     .flash b { display: block; }
@@ -212,8 +231,8 @@
     .flash.ok { background: var(--ok-soft); color: var(--ok); }
     .flash.bad { background: var(--bad-soft); color: var(--bad); }
     .flash.info { background: var(--surface-2); color: var(--ink-2); }
-    .recent { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 2px; }
-    .recent li { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px dashed var(--line); font-size: 13.5px; animation: rise .3s var(--ease); }
+    .recent { list-style: none; margin: 12px 0 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
+    .recent li { min-width: 0; display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px dashed var(--line); font-size: 13.5px; animation: rise .3s var(--ease); }
     .recent li:first-child { border-top: 0; }
     .recent i { width: 16px; text-align: center; }
     .recent li.pending, .recent li.undone { color: var(--ink-3); }
@@ -561,6 +580,41 @@
         </div>
       </section>
 
+      <!-- CEK QR -->
+      <section id="page-check" class="page" hidden>
+        <div class="scan-grid">
+          <div class="col">
+            <div class="card" id="checkCard">
+              <label class="lbl" for="checkInput">Scan QR produk yang ingin dicek</label>
+              <form id="checkForm" class="scan-field">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input class="input" id="checkInput" placeholder="Scan QR atau ketik item code…" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="search">
+                <button class="btn primary icon" id="checkBtn" type="submit" aria-label="Cek"><i class="fa-solid fa-arrow-right"></i></button>
+              </form>
+              <div class="row">
+                <button class="btn block" id="btnCam2" type="button"><i class="fa-solid fa-camera"></i><span>Cek dengan Kamera</span></button>
+                <button class="btn" id="btnDemoQR2" type="button" hidden title="Isi contoh QR (demo)"><i class="fa-solid fa-wand-magic-sparkles"></i> QR contoh</button>
+              </div>
+              <div id="camBox2" hidden><div id="camView2"></div></div>
+              <p class="muted" style="font-size:13px;margin-top:12px"><i class="fa-solid fa-shield-halved"></i> Hanya mengecek — tidak menyimpan atau mengubah data scan.</p>
+            </div>
+          </div>
+          <div class="col">
+            <div id="checkResult">
+              <div class="card empty">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <b>Belum ada QR dicek</b>
+                Scan QR produk untuk melihat apakah sudah di-scan dan masuk ke PO / MOP mana.
+              </div>
+            </div>
+            <div class="card" id="checkHistCard" hidden>
+              <h3>Riwayat cek sesi ini</h3>
+              <ul class="recent" id="checkHist"></ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- DAFTAR PO -->
       <section id="page-po" class="page" hidden>
         <div class="stats" id="poStats"></div>
@@ -636,7 +690,7 @@
    Tidak perlu diisi jika file ini disajikan langsung dari Apps Script.
    ===================================================================== */
 const CONFIG = {
-  API_URL: 'https://script.google.com/macros/s/AKfycbyKe2-h0UZP9mJpbRoZAmQ67VZiKHyHt5oZ0jDqtYxfR8821KKQkCLc5lwftQEybwmgaA/exec',
+  API_URL: 'https://script.google.com/macros/s/AKfycbzs0wLBSWuOcEdqlFuLWrDQUWQMFIuzDln2zpZ4dJ2uHp9n9aIzaHbr_oJbqNXrc38/exec',
   // Berapa scan boleh menunggu jawaban server sekaligus. 3 = operator bisa scan beruntun
   // tanpa menunggu; 1 = scan berikutnya baru bisa setelah server menjawab (paling aman).
   SCAN_QUEUE: 3
@@ -673,6 +727,7 @@ const state = {
   lookup: { pelanggan: [], warna: [], ukuran: [] },
   activePO: [], po: null, scanBusy: false, cam: null, recent: [],
   queue: [], pumping: false, savedRaw: new Set(),
+  checkBusy: false, checkHist: [], camCfg: null,
   poList: null, poFilter: 'all', poQuery: '',
   formMode: 'new', masterTab: 'pelanggan', masterQuery: '', users: []
 };
@@ -872,7 +927,8 @@ function initTheme() {
    ===================================================================== */
 const PAGES = [
   { id: 'scan',   label: 'Scanner',   icon: 'fa-qrcode',           title: 'Operator Scanner', sub: 'Scan QR/barcode lalu tetapkan spesifikasi item.' },
-  { id: 'po',     label: 'Daftar PO', icon: 'fa-list-check',       title: 'Daftar Master PO', sub: 'Progres seluruh PO, edit, hapus, dan export XLSX.', admin: true },
+  { id: 'check',  label: 'Cek QR',    icon: 'fa-magnifying-glass', title: 'Cek QR Produk',    sub: 'Cari tahu sebuah produk sudah di-scan atau belum, dan masuk PO / MOP mana.' },
+  { id: 'po',     label: 'Daftar PO', icon: 'fa-list-check',      title: 'Daftar Master PO', sub: 'Progres seluruh PO, edit, hapus, dan export XLSX.', admin: true },
   { id: 'form',   label: 'PO Baru',   icon: 'fa-file-circle-plus', title: 'Input PO Baru',    sub: 'Daftarkan PO beserta rincian item dan kuota.', admin: true },
   { id: 'master', label: 'Master',    icon: 'fa-database',         title: 'Master Data',      sub: 'Kelola pelanggan, warna, dan ukuran.', admin: true },
   { id: 'users',  label: 'User',      icon: 'fa-users-gear',       title: 'Kelola User',      sub: 'Akun dan hak akses pengguna.', admin: true }
@@ -892,6 +948,8 @@ function endSession() {
   stopCam();
   store.del('coa_session'); store.del('coa_page'); store.del('coa_po');
   Object.assign(state, { token: null, user: null, po: null, poList: null, recent: [], users: [], page: null, queue: [], scanBusy: false, savedRaw: new Set() });
+  state.checkHist = []; renderCheckHist();
+  $('#checkResult').innerHTML = '<div class="card empty"><i class="fa-solid fa-magnifying-glass"></i><b>Belum ada QR dicek</b>Scan QR produk untuk melihat apakah sudah di-scan dan masuk ke PO / MOP mana.</div>';
   renderRecent(); updateQueueInfo();
   if ($('#modal').open) $('#modal').close();
   $('#loginPass').value = '';
@@ -913,7 +971,7 @@ function showApp() {
   $$('[data-initials]').forEach(el => el.textContent = initials);
   $$('[data-username]').forEach(el => el.textContent = u.name);
   $$('[data-role]').forEach(el => el.textContent = u.role);
-  $('#demoBadge').hidden = !DEMO; $('#btnDemoQR').hidden = !DEMO;
+  $('#demoBadge').hidden = !DEMO; $('#btnDemoQR').hidden = !DEMO; $('#btnDemoQR2').hidden = !DEMO;
 
   const pages = myPages();
   const btn = p => `<button type="button" data-go="${p.id}"><i class="fa-solid ${p.icon}"></i><span>${p.label}</span></button>`;
@@ -927,7 +985,7 @@ function showApp() {
 
 function go(id) {
   const page = myPages().find(p => p.id === id) || PAGES[0];
-  if (state.page === 'scan' && page.id !== 'scan') stopCam();
+  if (state.page !== page.id) stopCam();
   state.page = page.id; store.set('coa_page', page.id);
   $$('.page').forEach(s => s.hidden = s.id !== 'page-' + page.id);
   const navId = page.id === 'form' && state.formMode === 'edit' ? 'po' : page.id; // saat edit, menu aktif tetap "Daftar PO"
@@ -938,6 +996,7 @@ function go(id) {
   if (page.id === 'users') loadUsers();
   if (page.id === 'form') { if (state.formMode === 'edit') setTitle('Edit Master PO', 'Ubah header, tambah item, atau sesuaikan QTY target.'); else if (!$('#formItems').children.length) resetForm(); }
   if (page.id === 'scan') focusScan();
+  if (page.id === 'check') focusCheck();
 }
 function setTitle(title, sub) { $('#pageTitle').textContent = title; $('#pageSub').textContent = sub || ''; }
 
@@ -1235,36 +1294,125 @@ async function undoScan(id) {
 
 /* ---------- kamera ---------- */
 const camLast = { text: '', at: 0 };
-async function toggleCam() {
+// Satu kamera dipakai dua halaman: Scanner (simpan scan) dan Cek QR (hanya baca).
+const CAMS = {
+  scan:  { view: 'camView',  box: '#camBox',  btn: '#btnCam',  label: 'Scan dengan Kamera', busy: () => state.scanBusy,  onText: t => submitScan(t) },
+  check: { view: 'camView2', box: '#camBox2', btn: '#btnCam2', label: 'Cek dengan Kamera',  busy: () => state.checkBusy, onText: t => checkQR(t) }
+};
+async function toggleCam(which) {
   if (state.cam) return stopCam();
-  const btn = $('#btnCam');
+  const cfg = CAMS[which] || CAMS.scan;
+  const btn = $(cfg.btn);
   btn.classList.add('loading');
   try {
     await loadScript(LIB.qr);
-    $('#camBox').hidden = false;
-    const cam = new Html5Qrcode('camView');
+    $(cfg.box).hidden = false;
+    const cam = new Html5Qrcode(cfg.view);
     await cam.start({ facingMode: 'environment' },
       { fps: 10, qrbox: (w, h) => { const s = Math.floor(Math.min(w, h) * .72); return { width: s, height: s }; } },
       text => {
         // QR yang sama masih di depan kamera: abaikan selama 4 detik agar tidak memicu "duplikat".
-        if (state.scanBusy || (text === camLast.text && Date.now() - camLast.at < 4000)) return;
+        if (cfg.busy() || (text === camLast.text && Date.now() - camLast.at < 4000)) return;
         camLast.text = text; camLast.at = Date.now();
-        submitScan(text);
+        cfg.onText(text);
       }, () => {});
-    state.cam = cam;
+    state.cam = cam; state.camCfg = cfg;
     $('span', btn).textContent = 'Tutup Kamera';
   } catch (e) {
-    $('#camBox').hidden = true;
+    $(cfg.box).hidden = true;
     toast('Kamera tidak bisa dibuka. Izinkan akses kamera dan pastikan halaman memakai HTTPS.', 'bad');
   } finally { btn.classList.remove('loading'); }
 }
 function stopCam() {
   const cam = state.cam;
   if (!cam) return;
+  const cfg = state.camCfg || CAMS.scan;
   state.cam = null;
-  $('#camBox').hidden = true;
-  $('#btnCam span').textContent = 'Scan dengan Kamera';
+  $(cfg.box).hidden = true;
+  $(cfg.btn + ' span').textContent = cfg.label;
   cam.stop().then(() => cam.clear()).catch(() => {});
+}
+
+/* =====================================================================
+   HALAMAN CEK QR (hanya baca)
+   ===================================================================== */
+function focusCheck() {
+  if (state.page !== 'check' || state.cam || $('#modal').open) return;
+  setTimeout(() => { const el = $('#checkInput'); if (el.offsetParent) el.focus({ preventScroll: true }); }, 120);
+}
+const fmtStamp = s => { const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}:\d{2})/.exec(s || ''); return m ? `${m[3]}/${m[2]}/${m[1]} ${m[4]}` : (s || '-'); };
+
+async function checkQR(raw) {
+  raw = String(raw || '').trim();
+  if (!raw || state.checkBusy) return;
+  state.checkBusy = true;
+  $('#checkBtn').classList.add('loading');
+  try {
+    const r = await api('checkQR', raw);
+    renderCheck(r);
+    if (!r.registered) sfx.bad(); else if (r.scanned) sfx.ok(); else sfx.pick();
+    const d = new Date();
+    state.checkHist.unshift({
+      kind: !r.registered ? 'bad' : r.scanned ? 'ok' : 'info',
+      text: !r.registered ? `Tidak terdaftar — ${shortQR(raw)}` : r.scanned ? `${r.itemCode} → ${r.scan.noPO}${r.scan.mop ? ' · MOP ' + r.scan.mop : ''}` : `${r.itemCode} — belum di-scan`,
+      time: `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+    });
+    state.checkHist = state.checkHist.slice(0, 8);
+    renderCheckHist();
+  } catch (e) {
+    if (e.code === 'AUTH') return;
+    sfx.bad();
+    $('#checkResult').innerHTML = `<div class="card"><div class="verdict bad"><i class="fa-solid fa-triangle-exclamation"></i><div><b>Gagal mengecek</b><span>${esc(e.message)}</span></div></div></div>`;
+  } finally {
+    state.checkBusy = false; camLast.at = Date.now();
+    $('#checkBtn').classList.remove('loading');
+    focusCheck();
+  }
+}
+function renderCheckHist() {
+  const icon = { ok: 'fa-check ok', bad: 'fa-xmark bad', info: 'fa-circle' };
+  $('#checkHistCard').hidden = !state.checkHist.length;
+  $('#checkHist').innerHTML = state.checkHist.map(h => `<li><i class="fa-solid ${icon[h.kind]}"></i><span class="t" title="${esc(h.text)}">${esc(h.text)}</span><time>${h.time}</time></li>`).join('');
+}
+function renderCheck(r) {
+  const fact = (label, value, wide) => `<div class="fact ${wide ? 'w2' : ''}"><small>${label}</small><b>${esc(value || '-')}</b></div>`;
+  const idFacts = fact('Item code', r.itemCode) + fact('Batch', r.batchCode);
+  let html;
+  if (!r.registered) {
+    html = `<div class="card">
+      <div class="verdict bad"><i class="fa-solid fa-circle-xmark"></i><div><b>QR tidak terdaftar</b><span>Kode ini tidak ada di Master_QR.</span></div></div>
+      <div class="facts">${fact('Kode yang di-scan', r.scannedURL, true)}</div>
+    </div>`;
+  } else if (!r.scanned) {
+    html = `<div class="card">
+      <div class="verdict info"><i class="fa-solid fa-circle-question"></i><div><b>Belum di-scan</b><span>Produk ini belum masuk ke PO mana pun.</span></div></div>
+      <div class="facts">${idFacts}</div>
+    </div>`;
+  } else {
+    const s = r.scan;
+    // Bandingkan dengan PO yang sedang dibuka di Scanner, supaya tumpukan tidak tertukar.
+    const note = !state.po ? '' : state.po.noPO === s.noPO
+      ? `<div class="flash ok check-note"><i class="fa-solid fa-circle-check"></i><div><b>Sama dengan PO di Scanner</b><span>Produk ini milik PO yang sedang Anda kerjakan.</span></div></div>`
+      : `<div class="flash bad check-note"><i class="fa-solid fa-triangle-exclamation"></i><div><b>Berbeda dengan PO di Scanner</b><span>Anda sedang mengerjakan ${esc(state.po.noPO)}. Produk ini milik PO lain — pisahkan.</span></div></div>`;
+    html = `<div class="card">
+      <div class="verdict ok"><i class="fa-solid fa-circle-check"></i><div><b>Sudah di-scan</b><span>${esc(fmtStamp(s.timestamp))} oleh ${esc(s.operator || '-')}</span></div></div>
+      <div class="dest">
+        <div><small>Nomor PO</small><b>${esc(s.noPO)}</b></div>
+        <div><small>MOP</small><b>${esc(s.mop || '-')}</b></div>
+      </div>
+      ${note}
+      <div class="facts">
+        ${fact('Pelanggan', nameOf('pelanggan', s.idPelanggan), true)}
+        ${fact('Deskripsi', s.deskripsi, true)}
+        ${fact('Warna', nameOf('warna', s.idWarna))}
+        ${fact('Ukuran', nameOf('ukuran', s.idUkuran))}
+        ${idFacts}
+        ${fact('Tgl produksi', isoToDMY(s.tglProduksi))}
+        <div class="fact"><small>Status PO</small><b>${s.poStatus ? statusPill(s.poStatus) : '-'}</b></div>
+      </div>
+    </div>`;
+  }
+  $('#checkResult').innerHTML = html;
 }
 
 /* =====================================================================
@@ -1397,7 +1545,7 @@ function resetForm() {
   $('#btnCancelEdit').hidden = true;
   $('#formItems').innerHTML = '';
   addItemRow({});
-  if (state.page === 'form') setTitle('Input PO Baru', PAGES[2].sub);
+  if (state.page === 'form') setTitle('Input PO Baru', PAGES.find(p => p.id === 'form').sub);
 }
 async function startEdit(noPO, btn) {
   const res = await run(btn, () => api('getPOForEdit', noPO));
@@ -1631,7 +1779,12 @@ function bind() {
   bindPOCombo();
   $('#btnRefreshPO').onclick = e => refreshActivePO(e.currentTarget);
   $('#scanForm').onsubmit = e => { e.preventDefault(); const el = $('#scanInput'), v = el.value; el.value = ''; submitScan(v); };
-  $('#btnCam').onclick = toggleCam;
+  $('#btnCam').onclick = () => toggleCam('scan');
+
+  // Cek QR
+  $('#checkForm').onsubmit = e => { e.preventDefault(); const el = $('#checkInput'), v = el.value; el.value = ''; checkQR(v); };
+  $('#btnCam2').onclick = () => toggleCam('check');
+  $('#btnDemoQR2').onclick = () => { if (window.COA_MOCK && COA_MOCK.sampleCheckQR) { $('#checkInput').value = COA_MOCK.sampleCheckQR(); $('#checkInput').focus(); } };
   $('#btnDemoQR').onclick = () => { if (window.COA_MOCK && COA_MOCK.sampleQR) { $('#scanInput').value = COA_MOCK.sampleQR(); $('#scanInput').focus(); } };
 
   // Daftar PO

@@ -109,6 +109,19 @@
       db.logs.push({ noPO, item: v.itemCode, batch: v.batchCode, deskripsi: desc, idWarna: w, idUkuran: u, url: v.scannedURL, op: s.name });
       return { message: 'BERHASIL: ' + v.itemCode, itemCode: v.itemCode, item: { deskripsi: desc, idWarna: w, idUkuran: u }, poDetails: details(noPO) };
     },
+    checkQR(s, input) {
+      input = String(input).trim();
+      const q = db.qr.find(x => x.url === input || x.item.toLowerCase() === input.toLowerCase());
+      if (!q) return { registered: false, scanned: false, scannedURL: input };
+      const out = { registered: true, scanned: false, scannedURL: q.url, itemCode: q.item, batchCode: q.batch };
+      const l = db.logs.find(x => x.item === q.item);
+      if (!l) return out;
+      const po = db.po.find(p => p.noPO === l.noPO) || {};
+      out.scanned = true;
+      out.scan = { noPO: l.noPO, mop: po.mop || '', idPelanggan: po.idPelanggan || '', poStatus: po.status || '', tglProduksi: po.tglProduksi || '',
+        deskripsi: l.deskripsi, idWarna: l.idWarna, idUkuran: l.idUkuran, timestamp: l.ts || '2026-11-10 09:15:00', operator: l.op || 'Operator Gudang' };
+      return out;
+    },
     undoScan(s, noPO, itemCode) {
       const log = db.logs.find(l => l.item === itemCode && l.noPO === noPO);
       if (!log) throw fail('Scan tidak ditemukan (mungkin sudah dibatalkan).');
@@ -197,6 +210,14 @@
     }, 220));
   };
   /** QR contoh berikutnya yang belum pernah di-scan (untuk tombol "QR contoh"). */
+  /** Contoh bergiliran untuk halaman Cek QR: sudah di-scan, belum di-scan, tidak terdaftar. */
+  let checkTurn = 0;
+  window.COA_MOCK.sampleCheckQR = function () {
+    const turn = checkTurn++ % 3;
+    if (turn === 0 && db.logs.length) return db.logs[Math.floor(Math.random() * db.logs.length)].url;
+    if (turn === 1) return window.COA_MOCK.sampleQR();
+    return 'https://qr.example.com/v/TIDAK-ADA';
+  };
   window.COA_MOCK.sampleQR = function () {
     const used = {}; db.logs.forEach(l => used[l.item] = 1);
     const q = db.qr.find(x => !used[x.item]);
