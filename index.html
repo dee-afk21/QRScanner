@@ -5,7 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="robots" content="noindex, nofollow">
   <meta name="theme-color" content="#0e1424">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Register COA">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>System Register COA</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Cpath d='M8 8h6v6H8zM18 8h6v6h-6zM8 18h6v6H8zM18 18h3v3h-3zM21 21h3v3h-3z' fill='%23fff'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -166,6 +172,8 @@
     .who small { font-size: 12px; opacity: .7; }
     .side-foot .btn { color: var(--side-ink); width: 36px; height: 36px; }
     .side-foot .btn:hover { background: rgba(255,255,255,.08); color: #fff; }
+    .install-side { margin-top: -10px; background: rgba(255,255,255,.06); border-color: var(--side-line); color: #fff; justify-content: center; }
+    .install-side:hover { background: rgba(255,255,255,.12); }
 
     .main { min-width: 0; display: flex; flex-direction: column; }
     .top { display: flex; align-items: center; gap: 12px; padding: 22px 28px 6px; }
@@ -445,6 +453,72 @@
       @keyframes sheet { from { transform: translateY(100%); } }
       .modal-card > footer .btn { flex: 1; height: 50px; }
     }
+    /* ============ HP KECIL (layar 4 inci, lebar 320–380px) ============ */
+    @media (max-width: 380px) {
+      .login-panel { padding: 20px 16px; }
+      .login-box .brand { margin-bottom: 20px; }
+      .login-box h2 { font-size: 23px; }
+      .login-box > p { margin-bottom: 18px; }
+      .login-box form { gap: 12px; }
+
+      .top { padding-left: 12px; padding-right: 12px; gap: 6px; }
+      .top .logo { display: none; }
+      .top h1 { font-size: 16px; }
+      .top .btn.icon { width: 36px; height: 36px; }
+      .pages { padding-left: 12px; padding-right: 12px; padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
+      .card { padding: 14px; }
+      .tabbar { left: 6px; right: 6px; bottom: calc(6px + env(safe-area-inset-bottom)); padding: 4px; border-radius: 16px; }
+      .tabbar button { font-size: 9.5px; letter-spacing: -.01em; white-space: nowrap; padding: 7px 0 6px; min-width: 0; }
+      .tabbar button i { font-size: 16px; }
+      .row { flex-wrap: wrap; }
+      .row > .btn.block { flex: 1 1 auto; }
+      .row > .combo { flex-basis: 0; }
+
+      .hero { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 4px 12px; align-items: center; }
+      .hero-info { display: contents; }
+      .ring { width: 72px; height: 72px; grid-row: 1 / span 3; }
+      .ring-c { font-size: 16px; }
+      .hero-info h2 { font-size: 16px; }
+      .hero-info p { font-size: 12.5px; }
+      .hero-nums { grid-column: 1 / -1; margin-top: 8px; }
+      .item { padding: 11px; }
+      .size { min-width: 40px; height: 40px; font-size: 14px; }
+
+      .verdict { padding: 12px 14px; gap: 11px; }
+      .verdict > i { font-size: 24px; }
+      .verdict b { font-size: 17px; }
+      .dest { gap: 8px; }
+      .dest > div { padding: 10px; }
+      .dest b { font-size: 15.5px; }
+      .facts { gap: 8px; }
+      .fact { padding: 8px 10px; }
+
+      .stats { gap: 8px; }
+      .stat { padding: 10px; gap: 8px; }
+      .stat > i { display: none; }
+      .table { grid-template-columns: minmax(0, 1fr); padding: 0; }
+      .tr:not(.th) { padding: 12px; grid-template-columns: minmax(0, 1fr) auto; }
+      .irow { padding: 10px; gap: 8px; }
+      .list { padding: 4px; }
+      .li { padding: 10px 8px; gap: 10px; }
+      .li .id { min-width: 44px; padding: 3px 6px; }
+      .li[data-user] { flex-wrap: wrap; row-gap: 8px; }
+      .li[data-user] .t { flex-basis: calc(100% - 48px); }
+      .li[data-user] .pill { margin-left: 48px; }
+      .li[data-user] .acts { margin-left: auto; }
+      .seg button { padding: 0 4px; font-size: 13px; }
+
+      .modal-card > header { padding: 16px 16px 0; gap: 10px; }
+      .m-icon { width: 36px; height: 36px; font-size: 15px; border-radius: 11px; }
+      .m-body { padding: 12px 16px 4px; gap: 10px; }
+      .m-err { margin: 10px 16px 0; }
+      .modal-card > footer { padding: 12px 16px 14px; }
+      .modal-card > footer .btn { height: 44px; }
+      .opts { gap: 6px; }
+      .opt { padding: 7px 10px; gap: 10px; }
+      button.opt { min-height: 56px; }
+      .opt-t small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    }
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
     }
@@ -483,6 +557,7 @@
         </label>
         <button class="btn primary lg block" id="loginBtn" type="submit">Masuk <i class="fa-solid fa-arrow-right"></i></button>
       </form>
+      <button class="btn block" type="button" data-install hidden style="margin-top:14px"><i class="fa-solid fa-download"></i> Pasang sebagai aplikasi</button>
       <div id="cfgWarn" class="cfg-warn" hidden><b>API_URL belum diisi.</b> Buka index.html, isi <code>CONFIG.API_URL</code> dengan URL Web App Apps Script (…/exec).</div>
     </div>
   </section>
@@ -493,6 +568,7 @@
   <aside class="side">
     <div class="brand"><span class="logo"><i class="fa-solid fa-qrcode"></i></span><div><b>Register COA</b><small>Verification Portal</small></div></div>
     <nav id="nav" class="nav" aria-label="Menu utama"></nav>
+    <button class="btn install-side" type="button" data-install hidden><i class="fa-solid fa-download"></i> Pasang aplikasi</button>
     <div class="side-foot">
       <span class="avatar" data-initials></span>
       <div class="who"><b data-username></b><small data-role></small></div>
@@ -506,6 +582,7 @@
       <span class="logo"><i class="fa-solid fa-qrcode"></i></span>
       <div class="top-t"><h1 id="pageTitle"></h1><p id="pageSub"></p></div>
       <span class="demo-badge" id="demoBadge" hidden>MODE DEMO</span>
+      <button class="btn icon ghost m-only" data-install hidden title="Pasang aplikasi" aria-label="Pasang aplikasi"><i class="fa-solid fa-download"></i></button>
       <button class="btn icon ghost m-only" data-theme-toggle aria-label="Ganti tema"><i class="fa-solid fa-moon"></i></button>
       <button class="btn icon ghost m-only" data-logout aria-label="Akun"><span class="avatar" data-initials style="width:32px;height:32px;font-size:12px"></span></button>
     </header>
@@ -707,10 +784,14 @@ const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const fmt = n => Number(n || 0).toLocaleString('id-ID');
 const DEMO = new URLSearchParams(location.search).has('demo');
 const IN_GAS = !!(window.google && google.script && google.script.run);
+// Sesi disimpan di localStorage supaya login bertahan saat aplikasi ditutup lalu dibuka lagi
+// (server tetap mengakhiri sesi setelah 6 jam tanpa aktivitas). Mode demo memakai sessionStorage
+// agar tidak menimpa sesi asli.
 const store = {
-  get(k) { try { return JSON.parse(sessionStorage.getItem(k)); } catch (e) { return null; } },
-  set(k, v) { try { sessionStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
-  del(k) { try { sessionStorage.removeItem(k); } catch (e) {} }
+  box() { return DEMO ? sessionStorage : localStorage; },
+  get(k) { try { return JSON.parse(this.box().getItem(k)); } catch (e) { return null; } },
+  set(k, v) { try { this.box().setItem(k, JSON.stringify(v)); } catch (e) {} },
+  del(k) { try { this.box().removeItem(k); } catch (e) {} }
 };
 const scripts = {};
 function loadScript(src) {
@@ -1815,8 +1896,30 @@ function bind() {
   window.addEventListener('beforeunload', e => { if (state.queue.length) { e.preventDefault(); e.returnValue = ''; } });
 }
 
+/* ---------- PWA: service worker, tombol pasang, status koneksi ---------- */
+function initPWA() {
+  // Di dalam Apps Script halaman berjalan di iframe sandbox: tidak bisa dipasang.
+  if (IN_GAS) return;
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || ['localhost', '127.0.0.1'].includes(location.hostname))) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+  let prompt = null;
+  const show = on => $$('[data-install]').forEach(b => { b.hidden = !on; });
+  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); prompt = e; show(true); });
+  window.addEventListener('appinstalled', () => { prompt = null; show(false); toast('Aplikasi terpasang. Buka dari layar utama.', 'ok'); });
+  $$('[data-install]').forEach(b => b.addEventListener('click', async () => {
+    if (!prompt) return;
+    const p = prompt; prompt = null; show(false);
+    p.prompt();
+    try { await p.userChoice; } catch (e) {}
+  }));
+  window.addEventListener('offline', () => toast('Koneksi internet terputus. Scan belum bisa disimpan.', 'bad'));
+  window.addEventListener('online', () => toast('Koneksi internet kembali.', 'ok'));
+}
+
 async function init() {
   initTheme();
+  initPWA();
   $$('[data-date]').forEach(el => { el.outerHTML = dateField(el.dataset.date); });
   bind();
   if (DEMO) { store.del('coa_session'); try { await loadScript('demo-mock.js'); } catch (e) { toast('demo-mock.js tidak ditemukan.', 'bad'); } }
