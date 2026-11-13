@@ -26,7 +26,9 @@ self.addEventListener('activate', event => {
 async function networkFirst(request) {
   const cache = await caches.open(VERSION);
   try {
-    const res = await fetch(request);
+    // 'no-cache' = selalu tanyakan ke server apakah ada versi baru, jadi index.html yang
+    // baru di-upload langsung terpakai dan tidak tertahan cache browser.
+    const res = await fetch(request.url, { cache: 'no-cache', credentials: 'same-origin' });
     if (res && res.ok) cache.put(request, res.clone());
     return res;
   } catch (err) {

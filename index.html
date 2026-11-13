@@ -824,6 +824,9 @@ async function api(action, ...args) {
     let res;
     if (window.COA_MOCK) {
       res = await window.COA_MOCK(req);
+    } else if (DEMO) {
+      // Mode demo tidak boleh pernah menyentuh server asli, walaupun demo-mock.js gagal dimuat.
+      throw new Error('Mode demo tidak aktif karena demo-mock.js tidak termuat.');
     } else if (IN_GAS) {
       res = await new Promise((ok, no) => google.script.run.withSuccessHandler(ok).withFailureHandler(no).apiDispatch(req));
     } else {
@@ -1226,13 +1229,22 @@ function renderDetails(d, bumpKey) {
   }).join('') : '<div class="card empty"><b>PO ini belum punya item</b>Tambahkan item lewat menu Daftar PO.</div>';
 }
 
-function focusScan() {
-  if (state.page !== 'scan' || state.cam || !state.po || $('#modal').open) return;
-  setTimeout(() => {
-    const el = $('#scanInput');
-    // jangan rebut fokus saat operator sedang mengetik di pencarian PO
-    if (el.offsetParent && document.activeElement !== $('#poInput')) el.focus({ preventScroll: true });
-  }, 120);
+/**
+ * Kembalikan kursor ke kolom scan. now = true: langsung saat itu juga (dipakai di dalam ketukan
+ * pengguna, karena HP hanya mau memindahkan kursor / membuka keyboard selagi ketukan berlangsung),
+ * lalu diulang sesaat kemudian untuk berjaga-jaga bila tampilan baru saja digambar ulang.
+ */
+function focusScan(now) {
+  const take = () => {
+    if (state.page !== 'scan' || state.cam || !state.po || $('#modal').open) return;
+    const el = $('#scanInput'), a = document.activeElement;
+    if (!el.offsetParent || a === el) return;
+    // jangan rebut kursor saat operator sedang mengetik di kolom lain (mis. pencarian PO)
+    if (a && a !== document.body && a.matches('input, textarea, select')) return;
+    el.focus({ preventScroll: true });
+  };
+  if (now === true) take();
+  setTimeout(take, 120);
 }
 function flash(type, title, detail) {
   const icons = { ok: 'fa-circle-check', bad: 'fa-circle-xmark', info: 'fa-circle-info' };
@@ -1335,6 +1347,7 @@ async function pumpQueue() {
       if (samePO) renderDetails(state.po);
     }
     updateQueueInfo();
+    focusScan(); // setelah jawaban server (berhasil maupun ditolak) kursor tetap di kolom scan
   }
   state.pumping = false;
   updateQueueInfo();
@@ -1352,7 +1365,11 @@ function specDialog(raw, options) {
     title: 'Pilih warna & ukuran', text: 'Ketuk sekali untuk menyimpan.', icon: 'fa-box-open',
     wide: true, sticky: true, noEnter: true, noConfirm: true,
     html: `<div class="kv"><span>QR <b>${esc(shortQR(raw))}</b></span></div><div class="opts">${tiles}</div>`,
-    onOpen: (d, finish) => $$('.opt', d).forEach(b => { b.onclick = () => finish(options[+b.dataset.i]); })
+    onOpen: (d, finish) => {
+      // Kursor dikembalikan ke kolom scan di dalam ketukan itu sendiri (pilih ukuran maupun batal).
+      $$('.opt', d).forEach(b => { b.onclick = () => { finish(options[+b.dataset.i]); focusScan(true); }; });
+      $$('[data-x]', d).forEach(b => b.addEventListener('click', () => focusScan(true)));
+    }
   });
 }
 
@@ -1891,7 +1908,8 @@ function bind() {
   $('#masterSearch').oninput = e => { state.masterQuery = e.target.value.trim(); renderMaster(); };
   $('#btnAddUser').onclick = addUser;
 
-  document.addEventListener('visibilitychange', () => { if (document.hidden) stopCam(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) stopCam(); else focusScan(); });
+  window.addEventListener('focus', () => focusScan());
   // Scan yang masih di antrean hilang jika halaman ditutup: minta konfirmasi dulu.
   window.addEventListener('beforeunload', e => { if (state.queue.length) { e.preventDefault(); e.returnValue = ''; } });
 }
