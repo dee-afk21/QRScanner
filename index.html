@@ -152,6 +152,7 @@
     .pass .input { padding-right: 46px; }
     .pass button { position: absolute; right: 4px; top: 5px; }
     .login-err { background: var(--bad-soft); color: var(--bad); border-radius: var(--r-sm); padding: 11px 14px; font-size: 14px; font-weight: 600; animation: shake .35s; }
+    .ver { margin-top: 14px; text-align: center; color: var(--ink-3); font-size: 12px; }
     .cfg-warn { margin-top: 18px; background: var(--warn-soft); color: var(--warn); border-radius: var(--r-sm); padding: 11px 14px; font-size: 13px; }
 
     /* ============ APP SHELL ============ */
@@ -558,6 +559,7 @@
         <button class="btn primary lg block" id="loginBtn" type="submit">Masuk <i class="fa-solid fa-arrow-right"></i></button>
       </form>
       <button class="btn block" type="button" data-install hidden style="margin-top:14px"><i class="fa-solid fa-download"></i> Pasang sebagai aplikasi</button>
+      <div class="ver" data-ver></div>
       <div id="cfgWarn" class="cfg-warn" hidden><b>API_URL belum diisi.</b> Buka index.html, isi <code>CONFIG.API_URL</code> dengan URL Web App Apps Script (…/exec).</div>
     </div>
   </section>
@@ -772,6 +774,8 @@ const CONFIG = {
   // tanpa menunggu; 1 = scan berikutnya baru bisa setelah server menjawab (paling aman).
   SCAN_QUEUE: 3
 };
+// Naikkan setiap kali file ini diubah; tampil di halaman login dan dialog Keluar.
+const APP_VERSION = '0.1.1';
 const LIB = {
   qr: 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js',
   xlsx: 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'
@@ -1041,7 +1045,7 @@ function endSession() {
 }
 async function logout() {
   const u = state.user;
-  const yes = await modal({ title: 'Keluar dari aplikasi?', text: `${u.name} · ${u.role}`, icon: 'fa-right-from-bracket', confirmText: 'Keluar' });
+  const yes = await modal({ title: 'Keluar dari aplikasi?', text: `${u.name} · ${u.role} · versi ${APP_VERSION}`, icon: 'fa-right-from-bracket', confirmText: 'Keluar' });
   if (!yes) return;
   const token = state.token;
   api('logout', token).catch(() => {});
@@ -1908,6 +1912,27 @@ function bind() {
   $('#masterSearch').oninput = e => { state.masterQuery = e.target.value.trim(); renderMaster(); };
   $('#btnAddUser').onclick = addUser;
 
+  // SCANNER HANDHELD (bluetooth / USB) bekerja seperti keyboard. Jika kursor sedang tidak berada
+  // di kolom mana pun, ketikan scanner ditangkap di sini dan dimasukkan ke kolom scan halaman aktif,
+  // sehingga operator tidak perlu mengetuk kolom scan lebih dulu.
+  document.addEventListener('keydown', e => {
+    const target = state.page === 'scan' && state.po ? { el: $('#scanInput'), send: submitScan }
+                 : state.page === 'check' ? { el: $('#checkInput'), send: checkQR } : null;
+    if (!target || !state.user || $('#modal').open || e.ctrlKey || e.metaKey || e.altKey) return;
+    const a = document.activeElement;
+    if (a && a !== document.body && a.matches('input, textarea, select, [contenteditable]')) return;
+    const el = target.el;
+    if (e.key === 'Enter') {
+      if (!el.value.trim()) return;
+      e.preventDefault();              // jangan sampai Enter menekan tombol yang kebetulan terfokus
+      const v = el.value; el.value = '';
+      target.send(v);
+    } else if (e.key && e.key.length === 1) {
+      e.preventDefault();
+      el.value += e.key;
+      el.focus({ preventScroll: true }); // karakter berikutnya langsung masuk ke kolom
+    }
+  });
   document.addEventListener('visibilitychange', () => { if (document.hidden) stopCam(); else focusScan(); });
   window.addEventListener('focus', () => focusScan());
   // Scan yang masih di antrean hilang jika halaman ditutup: minta konfirmasi dulu.
@@ -1937,6 +1962,7 @@ function initPWA() {
 
 async function init() {
   initTheme();
+  $$('[data-ver]').forEach(el => { el.textContent = 'Versi ' + APP_VERSION; });
   initPWA();
   $$('[data-date]').forEach(el => { el.outerHTML = dateField(el.dataset.date); });
   bind();
